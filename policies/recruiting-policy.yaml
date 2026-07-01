@@ -1,0 +1,90 @@
+version: riley-v34
+owner: PARS Recruiting
+status: draft
+
+purpose: >
+  Business-owned recruiting policy used by Riley and downstream recruiter review workflows.
+  Keep policy thresholds here rather than hardcoding them into the stable system prompt.
+
+role:
+  title: 1099 Independent Contractor Driver
+  company: PARS
+  employment_relationship: independent_contractor
+
+eligibility:
+  minimum_age:
+    enabled: true
+    value: null
+    source_of_truth: PARS recruiting policy
+  minimum_driving_experience_years:
+    enabled: true
+    value: 5
+    reveal_to_candidate: false
+  work_authorization_required:
+    enabled: true
+    country: United States
+  smartphone_required:
+    enabled: true
+  background_check_required:
+    enabled: true
+  mvr_review_required:
+    enabled: true
+
+operational_expectations:
+  regular_assignment_activity_required:
+    enabled: true
+    reveal_exact_threshold_to_candidate: false
+  candidate_self_transportation_required:
+    enabled: true
+  upfront_costs_possible:
+    enabled: true
+  reimbursement_when_applicable:
+    enabled: true
+  mobile_app_required:
+    enabled: true
+
+hard_disqualifiers:
+  note: >
+    Riley should only end a screening early when a hard disqualifier is clearly confirmed.
+    Unclear cases should be routed to recruiter review.
+  examples:
+    - fewer_than_required_driving_years
+    - invalid_or_suspended_license
+    - no_work_authorization
+    - refuses_background_check
+    - refuses_mvr_review
+    - clear_major_driving_record_disqualifier
+
+review_conditions:
+  - unclear_driving_history
+  - application_discrepancy
+  - incomplete_work_authorization_answer
+  - unclear_license_status
+  - unclear_violation_or_accident_timing
+  - candidate_concern_about_background_check
+  - limited_availability_or_service_area
+  - policy_or_edge_case_outside_riley_confidence
+
+candidate_facing_policy:
+  reveal_internal_thresholds: false
+  imply_pass_or_fail: false
+  promise_hiring_outcome: false
+  defer_compensation_questions_to_recruiter: true
+
+recruiter_review_output:
+  required_summary_fields:
+    - candidate_reached
+    - interest_confirmed
+    - driving_background
+    - license_status
+    - driving_record_notes
+    - work_authorization
+    - smartphone
+    - role_alignment
+    - availability
+    - service_area
+    - background_check_comfort
+    - mvr_review_comfort
+    - discrepancies
+    - concerns
+    - recommended_next_step
