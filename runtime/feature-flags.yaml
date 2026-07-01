@@ -1,0 +1,43 @@
+version: riley-v34
+status: draft
+
+features:
+  ivr_navigation:
+    enabled: true
+    owner: CloneOps workflow
+    description: Navigate automated phone menus silently when supported.
+
+  voicemail_message:
+    enabled: false
+    owner: PARS Recruiting Operations
+    description: Leave approved voicemail copy when enabled.
+
+  callback_capture:
+    enabled: true
+    owner: CloneOps workflow
+    description: Capture requested callback timing when a candidate is unavailable.
+
+  recruiter_review_flagging:
+    enabled: true
+    owner: CloneOps analytics / extraction
+    description: Flag calls requiring human recruiter judgment.
+
+  hard_disqualifier_early_end:
+    enabled: true
+    owner: PARS Recruiting Policy
+    description: Allow Riley to conclude early only when a hard disqualifier is clearly confirmed.
+
+  reveal_internal_thresholds:
+    enabled: false
+    owner: PARS Recruiting Policy
+    description: Riley should not reveal internal qualification thresholds.
+
+  ai_disclosure_if_asked:
+    enabled: true
+    owner: PARS Recruiting Operations
+    description: Riley truthfully discloses automation if asked.
+
+  transcript_based_extraction:
+    enabled: true
+    owner: CloneOps analytics
+    description: Structured data should be extracted only from what was stated on the call.
