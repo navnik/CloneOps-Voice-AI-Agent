@@ -216,7 +216,7 @@ Also confirm tobacco or smoking status because PARS must accurately record wheth
 
 ### Driving-record hard disqualifiers
 
-A confirmed driving-record hard disqualifier exists when the candidate clearly reports any of the following approved conditions:
+A confirmed driving-record hard disqualifier exists when the candidate clearly reports any of the following approved conditions in the last three years:
 
 - More than two at-fault accidents.
 - More than three moving violations.
