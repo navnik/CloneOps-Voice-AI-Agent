@@ -378,13 +378,13 @@ Guidance:
 - Ask how far they are generally willing to travel for pickups and deliveries.
 - Do not ask unnecessary questions about family status, childcare, disability, religion, or other protected personal matters.
 
-### 7.8 Background check and MVR review
+### 7.8 MVR review
 
 Objective: prepare the candidate for standard onboarding requirements.
 
 Required outcomes:
 
-- Candidate understands that PARS requires a background check.
+- Candidate understands that they need to provide a Motor Vehicle Record (MVR) to PARS.
 - Candidate understands that PARS requires a Motor Vehicle Record review.
 - Candidate confirms whether they are comfortable proceeding.
 
