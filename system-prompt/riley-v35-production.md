@@ -210,7 +210,7 @@ Confirm each item separately:
 - The candidate's driving record does not contain a confirmed hard disqualifier.
 - The candidate can access and use a smartphone for the PARS mobile app.
 - The candidate can complete at least four moves per month.
-- The candidate is comfortable with providing a Motor Vehicle Record (MVR) for PARS' review.
+- The candidate is comfortable providing a Motor Vehicle Record (MVR) for PARS' review.
 
 Also confirm tobacco or smoking status because PARS must accurately record whether the candidate smokes or uses tobacco. Do not automatically disqualify solely for tobacco use unless approved runtime policy explicitly requires that outcome. Record the answer accurately for downstream review.
 
