@@ -1,0 +1,236 @@
+# Driver Screening Automation — Session Summary (Continued)
+## Date: July 25–26, 2026
+
+> **Previous Sessions:** July 18–22, 2026 · July 23–24, 2026
+
+---
+
+## Operating Mode
+
+**Consultative** — no changes to agents or flows unless explicitly asked. All flow changes require approval before proceeding. Never publish unless explicitly asked.
+
+---
+
+## Resources Involved
+
+| Resource | ID | Status |
+|---|---|---|
+| Flow 5: Riley Outbound Call Screening | `6a38149fd29587a3b0f2b776` | **Modified** (v90 draft, production on v88) |
+| Riley — Outbound Call (current agent) | `6a29b3f1850b63147fbf8b03` | Reviewed (extraction config) |
+| New Agent (Riley's Replacement) | `6a624b7c9f3a8fad28629634` | Reviewed (extraction config) |
+| Driver Application Analysis (email agent) | `6a0b2ab382501be2355ebcb8` | Reviewed (qualification criteria referenced) |
+| Data Store: Driver Application Tracking | `6a2873ae79a7e88a96365765` | No schema changes this session |
+
+---
+
+## What Was Reviewed
+
+### Flow 5 — Thorough Field-by-Field Audit
+
+A complete audit was conducted mapping the entire extraction-to-data-store pipeline for Flow 5: what the agent extracts → how Node 4 (Extract Structured Call Responses) transforms it → what gets written to the data store in each outcome path (qualified, rejected, no answer).
+
+This audit uncovered seven issues (A–G), all of which were fixed across versions v85–v90.
+
+---
+
+## Changes Made
+
+### Issue A — firstName/lastName corrections never persisted (FIXED in v86)
+
+Node 4 extracted `firstName` and `lastName` (with fallback to the candidate record), but both the Qualified and Rejected DS update nodes had these fields marked `skip: true`. If Riley corrected a name during the call (e.g., the Ashley/Minnie problem), the corrected name never reached the data store.
+
+**Fix:** Un-skipped `firstName` and `lastName` in both Qualified and Rejected update nodes, mapped to `=variables.extractedResponses.firstName` and `=variables.extractedResponses.lastName`.
+
+---
+
+### Issue B — voiceCallSummary always overwritten with empty string (FIXED in v85 + v86)
+
+Both Qualified and Rejected DS update nodes hardcoded `voiceCallSummary: ""`, wiping any summary on every call. Node 4 originally output the field as `callSummary` (name mismatch with DS field `voiceCallSummary`).
+
+**Fix (v85 by user):** Renamed Node 4 output from `callSummary` to `voiceCallSummary`.
+
+**Fix (v86):** Changed both DS update nodes from `""` to `=variables.extractedResponses.voiceCallSummary`. Also fixed the Send Recruiter Notification email body from `{{variables.extractedResponses.callSummary}}` to `{{variables.extractedResponses.voiceCallSummary}}`.
+
+---
+
+### Issue C — english and workAuth live-call updates never persisted (FIXED in v86)
+
+The agent extracts both `english` and `workAuth`, but Node 4 didn't include them, and both DS update nodes skipped them. If the live call answer differed from the application, the discrepancy was silently lost.
+
+**Fix:** Added `english: val(extracted.english, candidate.english)` and `workAuth: val(extracted.workAuth, candidate.workAuth)` to Node 4's return object. Un-skipped and mapped both fields in Qualified and Rejected update nodes.
+
+---
+
+### Issue D — callSummary/voiceCallSummary name mismatch (FIXED — same root cause as Issue B)
+
+---
+
+### Issue E — callbackAttemptCount hardcoded to "1" (FIXED in v87 by user)
+
+The No Answer update node set `callbackAttemptCount` to the string `"1"` instead of incrementing. The user removed it from the data object and set the fieldMapping to `skip: true`, so the No Answer path no longer touches `callbackAttemptCount` at all. Flow 6 handles incrementing.
+
+---
+
+### Issue F — Transcript Extract ran before extraction data existed (FIXED in v89)
+
+The Transcript Extract node built email content referencing `variables.extractedResponses` and `variables.screeningOutcome`, but those were set by later nodes. The user attempted a fix in v88 but the order was still wrong (Transcript Extract ran before Determine Outcome).
+
+**Fix (v89):** Corrected execution chain to the proper order:
+
+```
+API → Extract Structured Call Responses → Determine Voice Screening Outcome → Transcript Extract → Outcome Branch
+```
+
+---
+
+### Issue G — mvrProvide not in recruiter notification email (FIXED in v89)
+
+Added an "MVR Willingness" row to the Screening Responses table in the Send Recruiter Notification email, referencing `{{variables.extractedResponses.mvrProvide}}`.
+
+---
+
+### Qualification Logic Overhaul (v90)
+
+The most significant change this session. The old binary qualification logic in Determine Voice Screening Outcome rejected candidates whenever any hard field was not exactly `"Yes"` — treating `null`, `"Not Confirmed"`, and `"No"` identically. This caused false rejections when extraction failed or Riley didn't ask a question.
+
+**New three-way logic:**
+
+Hard fields checked: `candidateAge`, `drivingYears`, `driversLicense`, `canCompleteMoves`, `workAuth`, `drivingRecords` (+ `candidateSmoke` inverted — `"Yes"` = fail)
+
+| Outcome | Condition |
+|---|---|
+| `no_answer` | Phone/call status indicates no answer, busy, voicemail, etc. |
+| `rejected` | ALL hard fields have clear answers (`"Yes"` or `"No"`) AND at least one is a confirmed fail. Zero ambiguity. |
+| `needs_review` | ANY hard field is ambiguous (null/missing), OR all pass but `mvrProvide` = `"No"` |
+| `qualified` | All hard fields = `"Yes"`, `candidateSmoke` ≠ `"Yes"`, no review triggers |
+
+**Key design decision:** If ANY field is ambiguous, the candidate goes to `needs_review` even if other fields are `"No"`. The rationale is that we can't confidently reject with incomplete data — the recruiter needs to see the full picture.
+
+**New nodes added for the needs_review path:**
+
+1. **Is Needs Review** (CONDITION) — 4th branch on the Outcome Branch
+2. **Update Record — Needs Review** (DATA_STORE_UPDATE) — sets `qualificationStatus: "needs_review"`, `automationStatus: "recruiter_review_ready"`, `applicationStatus: "recruiter_review"`, `funnelStage: "recruiter_review_ready"`. Does NOT set `voiceScreenPassedAt` or `voiceScreenFailedAt`.
+3. **Send Transcript Email — Needs Review** (MICROSOFT_SEND) — same format as qualified/rejected transcript emails
+4. **Send Recruiter Notification — Needs Review** (MICROSOFT_SEND) — amber-styled email with "Review Reasons" section listing exactly which fields triggered the review, plus full screening responses table and call summary
+
+**Fields added to qualification check (previously not checked):**
+
+- `workAuth` — `"No"` is now a hard reject (was skipped before)
+- `drivingRecords` — `"No"` is now a hard reject (was skipped before)
+
+**Fields intentionally NOT added as hard disqualifiers:**
+
+- `english` — confirmed by completing the call; not a hard reject
+- `smartPhone` — important but not a hard disqualifier; informational only
+- `mvrProvide` — `"No"` triggers `needs_review`, not rejection (per policy: tobacco and MVR are not hard disqualifiers)
+
+**Impact on previous calls (retroactive analysis):**
+
+| Candidate | Old Outcome | New Outcome | Reason |
+|---|---|---|---|
+| Paul | rejected (`canCompleteMoves` null) | **needs_review** | Ambiguous field → recruiter review |
+| Erik | qualified | qualified | No change |
+| Crystal | rejected (`candidateAge` null, `drivingYears` null) | **needs_review** | Ambiguous fields → recruiter review |
+
+The `screeningOutcome` output now includes a `reviewReasons` array with human-readable strings, e.g.:
+
+- `"Minimum age requirement (25+) — not confirmed during call"`
+- `"Candidate unwilling or unable to provide MVR"`
+
+---
+
+## Current Flow 5 Execution Chain (v90)
+
+```
+1. Filter Riley Outbound Call (BRANCH)
+   ├── No Matching Agent (CONDITION) → stops
+   └── Matching Agent (CONDITION)
+       2. Lookup Candidate Record (DATA_STORE_GET)
+          3. Get Call Session ID - API (API)
+             4. Extract Structured Call Responses (CODE) → sets extractedResponses
+                5. Determine Voice Screening Outcome (CODE) → sets screeningOutcome
+                   6. Transcript Extract (CODE) → sets codeResult
+                      7. Outcome Branch (BRANCH)
+                         ├── Is Qualified → DS Update → Transcript Email → Recruiter Notification
+                         ├── Is Rejected → DS Update → Transcript Email → Rejection Email
+                         ├── Is No Answer → DS Update
+                         └── Is Needs Review → DS Update → Transcript Email → Recruiter Notification (amber)
+```
+
+---
+
+## Decisions Made
+
+1. **voiceCallSummary must be persisted to the data store** — was being wiped with empty string on every call. Fixed.
+2. **firstName/lastName from voice extraction should overwrite DS values** — if Riley corrects a name during the call, the corrected name should be the system of record.
+3. **english and workAuth from voice calls should update the DS** — live call answers take precedence over application answers.
+4. **callbackAttemptCount removed from No Answer path** — Flow 6 handles incrementing; Flow 5 no longer touches it.
+5. **Execution order corrected** — Transcript Extract must run after both Extract Structured Call Responses and Determine Voice Screening Outcome so all variables are populated.
+6. **Three-way qualification logic** — reject only with complete data and confirmed failures; any ambiguity routes to recruiter review.
+7. **workAuth and drivingRecords added as hard qualification fields** — `"No"` on either is a confirmed disqualifier.
+8. **english, smartPhone, mvrProvide are NOT hard disqualifiers** — `english` is confirmed by call completion; `smartPhone` is informational; `mvrProvide` `"No"` triggers `needs_review` only.
+9. **Ambiguity always wins over rejection** — if any hard field is null/missing alongside a confirmed `"No"` on another field, the candidate goes to `needs_review`, not `rejected`. Recruiters need the full picture.
+10. **mvrProvide added to recruiter notification email** — both qualified and needs_review paths now show MVR willingness.
+
+---
+
+## Unpublished Changes
+
+| Resource | Draft Version | Production Version | Changes |
+|---|---|---|---|
+| Flow 5: Riley Outbound Call Screening | v90 | v88 | Issues A–G fixed, three-way qualification logic, needs_review path added |
+| Flow 3: Scheduling Reminder | v50 | v49 | From July 18–22 — split `in` operator, added No Records email |
+| Flow 6: Callback / No-Show Recovery | v32 | v31 | From July 18–22 — added 3rd callback attempt |
+| Flow 7: Recruiter Review Queue | v13 | v12 | From July 18–22 — added P5 search, fixed P6, added No Records email |
+
+> **Note:** Flow 5 v88 was published by the user during this session (was v85 production at start of session, user published through v88).
+
+---
+
+## Unresolved Issues
+
+### From This Session
+
+1. **Flow 5 needs_review path not yet tested** — the three-way logic and new nodes should be validated with test executions before publishing.
+2. **Recruiter notification email (needs_review) uses raw array for reviewReasons** — `{{variables.screeningOutcome.reviewReasons}}` renders as a JavaScript array. May need a CODE node or handlebars helper to format as HTML list items. Should be tested.
+3. **Flow 7 P3 search for needs_review** — now that Flow 5 can actually produce `needs_review` outcomes, Flow 7's P3 priority search should work. But it should be verified after publishing.
+
+### Carried Forward from Previous Sessions
+
+4. **New agent not yet deployed to production** — needs test calls before swapping.
+5. **Flow 4 / Auto-Dialer agent ID** — when new agent replaces current Riley, Flow 4's agent filter and the Auto-Dialer need to be updated to point to new agent ID (`6a624b7c9f3a8fad28629634`).
+6. **Flow 1 & Flow 5 have active failures** — Flow 5 failed 5 times between July 6–15. Root cause not yet investigated.
+7. **Flow 1: Duplicate logic paths** — New record and existing record paths have nearly identical node chains that can drift out of sync.
+8. **Email agent has empty system prompt** — All intelligence is in the extraction/summary prompts.
+9. **Flow 2: No Calendly event cancellation** when email mismatch is detected.
+10. **Flow 3: Reminder emails go to test address** (`navnik.shivadas@parsinc.com`) instead of `{{item.data.email}}`.
+11. **Flow 4 + Auto-Dialer race condition** — Flow 4 marks `call_in_progress` after creating the activity, but Auto-Dialer might pick up the activity before the DS update completes.
+12. **Flow 6 trigger config uses old cron format** (`"cron"` instead of `"cronExpressions"` array).
+13. **Flow 2: voiceCallSummary cleared on every Calendly event** — would wipe existing summary if candidate reschedules after completing a call.
+14. **Data store: reminderCount and callbackAttemptCount type mismatch** — schema says NUMBER but flows write strings.
+15. **Data store: preScreenPassedAt stores literal `"$now()"` string** instead of actual timestamp.
+
+---
+
+## Next Steps (Suggested Priority)
+
+1. **Test Flow 5 v90** — run test executions to validate the three-way qualification logic and needs_review email formatting.
+2. **Publish Flow 5 (v90)** when testing is satisfactory.
+3. **Publish Flows 3, 6, 7** — still pending from July 18–22 session.
+4. **Run 5–10 test calls with the new agent** and compare extraction results against current Riley.
+5. **Swap production agent** — update Flow 4 / Auto-Dialer to point to new agent ID when test calls are satisfactory.
+6. **Fix Flow 3 reminder email recipients** — change from test address to `{{item.data.email}}`.
+7. **Investigate Flow 5 failures** — check execution logs for the July 6–15 failures.
+8. **Fix preScreenPassedAt bug** in Flow 1.
+9. **Fix Flow 6 trigger format**.
+
+---
+
+## Important Lessons Learned
+
+- **`!== 'Yes'` is not the same as `=== 'No'`** — treating null/missing extraction values the same as explicit `"No"` causes false rejections. Qualification logic must distinguish between confirmed failure, confirmed pass, and ambiguous/missing data.
+- **Execution order matters for variable references** — nodes that reference variables set by other nodes must run after those nodes. Re-parenting nodes changes execution order; verify the full chain after any re-parenting.
+- **DS update nodes have both a `data` object and `fieldMappings` array** — both must be updated consistently. A field set to `""` in the data object will overwrite the DS value even if the fieldMapping looks correct.
+- **Field name consistency across the pipeline is critical** — Node 4 outputting `callSummary` while the DS field is `voiceCallSummary` caused a silent data loss. Always trace field names end-to-end: extraction → CODE node → DS update → email templates.
+- **Skipped fields in DS updates are intentional omissions** — un-skipping a field means it will now be written on every execution. Make sure the value expression is correct before un-skipping.
+- **The recruiter notification email is the recruiter's primary interface** — any field added to extraction or the DS should also be added to the email template, or the recruiter won't see it.
