@@ -1,0 +1,114 @@
+
+
+# Driver Screening Automation — Session Summary
+
+## Date: July 18–22, 2026
+
+## Operating Mode
+**Consultative mode** — no changes to agents or flows unless explicitly asked. All flow changes require approval before proceeding. Never publish unless explicitly asked.
+
+---
+
+## What Was Reviewed
+All 8 flows, the data store, and both agents (email + voice) were audited against the original architecture document.
+
+| Resource | ID | Status |
+|---|---|---|
+| Flow 1: Driver Application Intake | `6a357f312c1eebe7d32dff00` | Reviewed, no changes made |
+| Flow 2: Calendly Webhook Receiver | `6a35863ebd6f38e916a9ae91` | Reviewed, no changes made |
+| Flow 3: Scheduling Reminder / No-Booking Recovery | `6a381cacd29587a3b0f336e4` | **Modified** |
+| Flow 4: Outbound Call Launch | `6a3589a01ab1841861e7aea9` | Reviewed, no changes made |
+| Flow 5: Riley Outbound Call Screening | `6a38149fd29587a3b0f2b776` | **Modified** |
+| Flow 6: Callback / No-Show Recovery | `6a381b621c3b76846fb7a7d5` | **Modified** |
+| Flow 7: Recruiter Review Queue | `6a381d9aa13701173b2c830f` | **Modified** |
+| Auto-Dialer | `6a42af4f2673701b641ae305` | Reviewed, no changes made |
+| Data Store | `6a2873ae79a7e88a96365765` | Reviewed, no changes made |
+| Riley Email Screener | `6a29a22fd32da4ec3a0345ba` | Reviewed, no changes made |
+| Riley Outbound Call | `6a29b3f1850b63147fbf8b03` | Reviewed, no changes made |
+
+---
+
+## Changes Made This Session
+
+### Flow 3 (v50 draft, production on v49)
+- **Replaced** the single search node that used the `in` operator (which crashed the UI) with two separate `eq` search nodes + a CODE merge node
+- **Added** "No Records" email node under the Not Found branch (user added subject/body manually)
+
+### Flow 5 (v82 draft, production on v81)
+- **Fixed Node 7** (Extract Structured Call Responses):
+  - Added `val()` helper function to filter junk values (`"null"`, `"N/A"`, `"Not Confirmed"`, `""`, etc.) before falling back to data store
+  - Fixed candidate record property path: `variables.candidateRecord?.data` → `candidateRaw.data || candidateRaw` (DATA_STORE_GET stores fields directly, not under `.data`)
+  - Fixed call metadata path: `input.data?.call` → `input.data?.data?.call`
+
+### Flow 6 (v32 draft, production on v31)
+- **Added 3rd callback attempt** (was 2, design doc specified 3):
+  - New condition: `callbackAttemptCount = 2`
+  - New Calendly link generation + DS update for attempt 2
+  - New "final follow-up" email with urgent tone
+  - Close condition changed from `>= 2` to `>= 3`
+- **Fixed attempt 1 status update** to re-enter Flow 3's reminder funnel: `automationStatus = scheduling_email_sent`, `applicationStatus = awaiting_candidate_booking`, `schedulingLinkSentAt = $now()`
+- **Fixed email link variables**: Attempt 1 email uses `newCalendlyLink`, Attempt 2 email uses `newCalendlyLink1`
+- User added Calendly link generation + DS update nodes for attempt 1 branch manually
+
+### Flow 7 (v13 draft, production on v12)
+- **Added P5 search**: `automationStatus = call_in_progress` filtered by CODE node to only records stuck > 24 hours
+- **Fixed P6 `in` operator**: Split into two `eq` searches (candidate_unresponsive + canceled) + CODE merge
+- **Added "No Records" email** under the No Records branch
+- **Fixed footer timestamp**: Changed from hardcoded "9:00 AM" to dynamic `now` variable
+- User changed schedule from 10 AM to 9 AM CT
+
+---
+
+## Decisions Made
+
+1. **Consultative mode**: Don't make changes unless explicitly asked. Describe what to change and wait for approval.
+2. **Never publish** unless explicitly asked.
+3. **Flow 5 qualification logic**: Node 8 only checks 5 hard fields (candidateAge, drivingYears, driversLicense, canCompleteMoves, candidateSmoke). Does NOT check english, workAuth, smartPhone — those are checked in Flow 1 pre-screen but not re-checked in voice screen. This is acknowledged but not changed.
+4. **Flow 6 callback recovery**: 3 attempts with Calendly link regeneration on each attempt. Attempt 1 re-enters Flow 3 reminder funnel. Attempt 2 stays as callback_requested. Attempt 3+ closes as unresponsive.
+5. **Flow 7 P5**: Searches for `call_in_progress` stuck > 24 hours (Option A).
+6. **Flow 7 execution results**: Confirmed that "no records" results are legitimate — the data store genuinely has no records matching the priority conditions at this time.
+
+---
+
+## Unresolved Issues from Initial Audit (Not Yet Addressed)
+
+### Critical
+1. **Flow 1 & Flow 5 have active failures** — Flow 5 failed 5 times between July 6–15. Root cause not yet investigated.
+2. **Flow 1: Duplicate logic paths** — New record and existing record paths have nearly identical node chains that can drift out of sync. Should be consolidated.
+3. **Email agent has empty system prompt** — All intelligence is in the extraction/summary prompts in analytics config. Should move core instructions to system prompt.
+
+### Important
+4. **Flow 2: No Calendly event cancellation** when email mismatch is detected — candidate keeps a booking that won't trigger a call.
+5. **Flow 3: Reminder emails go to test address** (`navnik.shivadas@parsinc.com`) instead of `{{item.data.email}}`. Candidates never receive reminders.
+6. **Flow 5: `callbackAttemptCount` hardcoded to `"1"` on no-answer** — should increment instead of reset.
+7. **Flow 5: P3 (`needs_review`) will almost never surface** in Flow 7 because Flow 5's qualification logic overwrites Riley's `needs_review` status.
+8. **Flow 4 + Auto-Dialer race condition** — Flow 4 marks `call_in_progress` after creating the activity, but Auto-Dialer might pick up the activity before the DS update completes.
+9. **Flow 6 trigger config uses old cron format** (`"cron"` instead of `"cronExpressions"` array) — may not fire.
+10. **Flow 2: `voiceCallSummary` cleared on every Calendly event** — would wipe existing summary if candidate reschedules after completing a call.
+11. **Data store: `reminderCount` and `callbackAttemptCount` type mismatch** — schema says NUMBER but flows write strings.
+12. **Voice agent extraction prompt has copy-paste errors** in field descriptions (drivingYears and canCompleteMoves both say "minimum age requirement").
+13. **Data store: `preScreenPassedAt` stores literal `"$now()"` string** instead of actual timestamp (visible in multiple records).
+
+---
+
+## Next Steps (Suggested Priority)
+
+1. **Publish pending changes** — Flow 3 (v50), Flow 5 (v82), Flow 6 (v32), Flow 7 (v13) are all draft
+2. **Fix Flow 3 reminder email recipients** — change `to` from test address to `{{item.data.email}}`
+3. **Investigate Flow 5 failures** — check execution logs for the July 6–15 failures
+4. **Fix `preScreenPassedAt` bug** in Flow 1 — it's writing the literal string `"$now()"` instead of evaluating it
+5. **Fix Flow 5 `callbackAttemptCount` increment** — should add to existing count, not hardcode `"1"`
+6. **Fix Flow 6 trigger format** — update to `cronExpressions` array
+7. **Consolidate Flow 1 duplicate paths**
+8. **Address Flow 5 / Flow 7 `needs_review` gap**
+9. **Review and fix voice agent extraction field descriptions**
+
+---
+
+## Important Lessons Learned This Session
+
+- **`update_flow` replaces the entire node array** — always include ALL nodes when updating, not just the changed one
+- **`DATA_STORE_GET` stores record data directly** in the output variable, not nested under `.data`
+- **`in` operator with array values crashes the UI** node panel — use separate `eq` searches + CODE merge instead
+- **Riley's extraction can return junk strings** (`"null"`, `"N/A"`, `"Not Confirmed"`) that JavaScript treats as truthy — use a `val()` helper to filter these
+- **Flow test replays use the original trigger input** but fetch live data store records — results may differ from the original execution
