@@ -1,0 +1,99 @@
+I was chatting with ORQIA, and found an issue with flow 1.
+
+I have uploaded it for you to take a look at it.
+
+I'll paste the entire chat with ORQIA here:
+
+
+
+Flow 1: https://apps.cloneops.ai/flows/6a357f312c1eebe7d32dff00 Why did the latest execution fail? It met all the criteria.
+
+The root cause is clear. Here's exactly what's happening:
+
+Root Cause: node-update-record — Wrong Key Variable
+
+Node: Update Data Store RecordError: Record with key "undefined" not found
+
+The node's key is set to:
+
+=variables.resolvedRecordEmail.existingKey
+
+But variables.resolvedRecordEmail is never populated — it's undefined. This means the key resolves to undefined, and the update fails because there's no record with that key.
+
+This is a consistent bug — it has failed on every new application since at least Aug 3rd (10+ failures, all the same node, all the same error).
+
+What the key should be
+
+Looking at the input data flowing into the node, the record is a new applicant being written for the first time. The data store uses email as the key (based on how Flow 5 and Flow 2 look up records by email). The key should simply be:
+
+=variables.applicantRecord.email
+
+or, if this is an update path after a CREATE node, the key should reference whatever variable the preceding CREATE node stored the key in.
+
+What to check in the flow
+
+There are two scenarios depending on what node-prepare-record-email (the parent node) is supposed to do:
+
+If this is a CREATE + UPDATE pattern — the CREATE node should write the record first (keyed by email), and the UPDATE node's key should be =variables.applicantRecord.email
+
+If resolvedRecordEmail was a variable from a lookup node — that lookup node may have been removed or renamed, leaving this node referencing a stale variable name
+
+The fix: In the Flow 1 editor, find the Update Data Store Record node (node-update-record) and change the key from:
+
+=variables.resolvedRecordEmail.existingKey
+
+to:
+
+=variables.applicantRecord.email
+
+This will correctly key the record by the applicant's email, which is consistent with how every other flow looks up and updates candidate records.
+
+
+
+How should we fix this? We need to fix this asap  
+
+
+
+Fixed and published. Flow 1: Driver Application Intake is now live at version 131.
+
+What was wrong & what was fixed
+
+The "email found" branch had 4 DATA_STORE_UPDATE nodes all using:
+
+=variables.resolvedRecordEmail.existingKey
+
+This key expression was returning undefined because records[0].key wasn't resolving correctly from the search result — causing every re-applicant (someone whose email already existed in the data store) to fail.
+
+All 4 affected nodes were fixed to use the direct, reliable key:
+
+=variables.agentResponse.extractedData.email
+
+NodeOld KeyNew Key
+
+Update Data Store Record
+
+resolvedRecordEmail.existingKey
+
+agentResponse.extractedData.email
+
+Update Record - Pre-Screen Passed
+
+resolvedRecordEmail.existingKey
+
+agentResponse.extractedData.email
+
+Update Record - Scheduling Email Sent
+
+resolvedRecordEmail.existingKey
+
+agentResponse.extractedData.email
+
+Update Record - Pre-Screen Failed
+
+resolvedRecordEmail.existingKey
+
+agentResponse.extractedData.email
+
+This is consistent with how the new-applicant branch already works (node-create-record uses agentResponse.extractedData.email as the key), and how every other flow in the system looks up candidates — by email.
+
+
