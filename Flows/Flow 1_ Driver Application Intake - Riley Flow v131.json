@@ -1,0 +1,1608 @@
+{
+  "_id": "6a357f312c1eebe7d32dff00",
+  "name": "Flow 1: Driver Application Intake - Riley Flow",
+  "description": "Flow 1",
+  "accountId": "6a071c6e8295557b402b73cb",
+  "trigger": {
+    "type": "EMAIL",
+    "config": {
+      "provider": "microsoft",
+      "cronExpressions": [
+        "*/3 * * * *"
+      ],
+      "credentialId": "6a0f4cd9e8c4522c7685d616",
+      "markAsRead": true,
+      "maxResults": 50,
+      "filterUnread": true,
+      "timeWindow": "1h",
+      "searchCriteria": "from:jeremy@philbeckwebdesign.com AND subject:New Entry: Driver Qualification Form"
+    }
+  },
+  "rootNodeId": "node-1781890987435",
+  "nodes": [
+    {
+      "nodeId": "node-1781890987435",
+      "name": "Riley - Email Screener - IC Recruiting",
+      "type": "AGENT",
+      "executionIndex": 1,
+      "config": {
+        "agentId": "6a29a22fd32da4ec3a0345ba",
+        "outputVariable": "agentResponse"
+      }
+    },
+    {
+      "nodeId": "node-search-by-email",
+      "name": "Search Data Store by Email",
+      "type": "DATA_STORE_SEARCH",
+      "executionIndex": 1,
+      "parentId": "node-1781890987435",
+      "config": {
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "outputVariable": "emailSearchResult",
+        "expressionMode": "jsonata",
+        "conditions": [
+          {
+            "field": "email",
+            "operator": "eq",
+            "value": "=variables.agentResponse.extractedData.email"
+          }
+        ]
+      }
+    },
+    {
+      "nodeId": "node-1782147771806",
+      "name": "Check If Found By Email",
+      "type": "BRANCH",
+      "executionIndex": 1,
+      "parentId": "node-search-by-email",
+      "config": {
+        "branches": [
+          "node-check-email-found",
+          "node-condition-email-found"
+        ],
+        "outputs": [
+          {
+            "id": "output-1",
+            "label": "Branch 1"
+          },
+          {
+            "id": "output-2",
+            "label": "Branch 2"
+          }
+        ],
+        "executionMode": "parallel"
+      }
+    },
+    {
+      "nodeId": "node-check-email-found",
+      "name": "Not Found",
+      "type": "CONDITION",
+      "executionIndex": 1,
+      "parentId": "node-1782147771806",
+      "config": {
+        "expression": "$count(variables.emailSearchResult.records) = 0"
+      }
+    },
+    {
+      "nodeId": "node-search-by-phone",
+      "name": "Search Data Store by Phone",
+      "type": "DATA_STORE_SEARCH",
+      "executionIndex": 1,
+      "parentId": "node-check-email-found",
+      "config": {
+        "conditionResult": false,
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "outputVariable": "phoneSearchResult",
+        "expressionMode": "jsonata",
+        "conditions": [
+          {
+            "field": "phone",
+            "operator": "eq",
+            "value": "=variables.agentResponse.extractedData.phone"
+          }
+        ]
+      }
+    },
+    {
+      "nodeId": "node-resolve-record",
+      "name": "Resolve Existing Record",
+      "type": "TRANSFORM",
+      "executionIndex": 1,
+      "parentId": "node-search-by-phone",
+      "config": {
+        "template": "{\r\n  \"exists\": $count(variables.phoneSearchResult.records) > 0,\r\n  \"existingKey\": $count(variables.phoneSearchResult.records) > 0 ? variables.phoneSearchResult.records[0].key : null,\r\n  \"recordKey\": variables.agentResponse.extractedData.email\r\n}",
+        "outputVariable": "resolvedRecord"
+      }
+    },
+    {
+      "nodeId": "node-prepare-record",
+      "name": "Prepare Applicant Record",
+      "type": "TRANSFORM",
+      "executionIndex": 1,
+      "parentId": "node-resolve-record",
+      "config": {
+        "template": "{\r\n  \"applicationThreadId\": variables.agentResponse.extractedData.applicationThreadId,\r\n  \"firstName\": variables.agentResponse.extractedData.firstName,\r\n  \"lastName\": variables.agentResponse.extractedData.lastName,\r\n  \"phone\": variables.agentResponse.extractedData.phone,\r\n  \"email\": variables.agentResponse.extractedData.email,\r\n  \"streetAddress\": variables.agentResponse.extractedData.streetAddress,\r\n  \"city\": variables.agentResponse.extractedData.city,\r\n  \"state\": variables.agentResponse.extractedData.state,\r\n  \"zip\": variables.agentResponse.extractedData.zip,\r\n  \"country\": variables.agentResponse.extractedData.country,\r\n  \"leadSource\": variables.agentResponse.extractedData.leadSource,\r\n  \"applicationSubmittedAt\": variables.agentResponse.extractedData.applicationSubmittedAt,\r\n  \"candidateAge\": variables.agentResponse.extractedData.candidateAge,\r\n  \"drivingYears\": variables.agentResponse.extractedData.drivingYears,\r\n  \"candidateSmoke\": variables.agentResponse.extractedData.candidateSmoke,\r\n  \"english\": variables.agentResponse.extractedData.english,\r\n  \"workAuth\": variables.agentResponse.extractedData.workAuth,\r\n  \"smartPhone\": variables.agentResponse.extractedData.smartPhone,\r\n  \"background\": variables.agentResponse.extractedData.background,\r\n  \"commentsOrQuestions\": variables.agentResponse.extractedData.commentsOrQuestions,\r\n  \"applicationReceivedAt\": $now(),\r\n  \"lastUpdatedAt\": $now(),\r\n  \"funnelStage\": \"application_received\",\r\n  \"applicationStatus\": \"new\",\r\n  \"automationStatus\": \"application_received\",\r\n  \"qualificationStatus\": \"\"\r\n}",
+        "outputVariable": "applicantRecord"
+      }
+    },
+    {
+      "nodeId": "node-create-record",
+      "name": "Create Data Store Record",
+      "type": "DATA_STORE_ADD",
+      "executionIndex": 1,
+      "parentId": "node-prepare-record",
+      "config": {
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "key": "=variables.agentResponse.extractedData.email",
+        "overwrite": false,
+        "outputVariable": "savedRecord",
+        "expressionMode": "jsonata",
+        "fieldMappings": [
+          {
+            "field": "applicationThreadId",
+            "value": "=variables.applicantRecord.applicationThreadId"
+          },
+          {
+            "field": "qualificationStatus",
+            "value": "=variables.applicantRecord.qualificationStatus"
+          },
+          {
+            "field": "automationStatus",
+            "value": "=variables.applicantRecord.automationStatus"
+          },
+          {
+            "field": "applicationStatus",
+            "value": "=variables.applicantRecord.applicationStatus"
+          },
+          {
+            "field": "firstName",
+            "value": "=variables.applicantRecord.firstName"
+          },
+          {
+            "field": "lastName",
+            "value": "=variables.applicantRecord.lastName"
+          },
+          {
+            "field": "phone",
+            "value": "=variables.applicantRecord.phone"
+          },
+          {
+            "field": "email",
+            "value": "=variables.applicantRecord.email"
+          },
+          {
+            "field": "streetAddress",
+            "value": "=variables.applicantRecord.streetAddress"
+          },
+          {
+            "field": "city",
+            "value": "=variables.applicantRecord.city"
+          },
+          {
+            "field": "state",
+            "value": "=variables.applicantRecord.state"
+          },
+          {
+            "field": "zip",
+            "value": "=variables.applicantRecord.zip"
+          },
+          {
+            "field": "country",
+            "value": "=variables.applicantRecord.country"
+          },
+          {
+            "field": "leadSource",
+            "value": "=variables.applicantRecord.leadSource"
+          },
+          {
+            "field": "applicationSubmittedAt",
+            "value": "=variables.applicantRecord.applicationSubmittedAt"
+          },
+          {
+            "field": "lastUpdatedAt",
+            "value": "=variables.applicantRecord.lastUpdatedAt"
+          },
+          {
+            "field": "candidateAge",
+            "value": "=variables.applicantRecord.candidateAge"
+          },
+          {
+            "field": "drivingYears",
+            "value": "=variables.applicantRecord.drivingYears"
+          },
+          {
+            "field": "candidateSmoke",
+            "value": "=variables.applicantRecord.candidateSmoke"
+          },
+          {
+            "field": "english",
+            "value": "=variables.applicantRecord.english"
+          },
+          {
+            "field": "workAuth",
+            "value": "=variables.applicantRecord.workAuth"
+          },
+          {
+            "field": "smartPhone",
+            "value": "=variables.applicantRecord.smartPhone"
+          },
+          {
+            "field": "background",
+            "value": "=variables.applicantRecord.background"
+          },
+          {
+            "field": "commentsOrQuestions",
+            "value": "=variables.applicantRecord.commentsOrQuestions"
+          },
+          {
+            "field": "schedulingLink",
+            "value": "=",
+            "skip": true
+          },
+          {
+            "field": "callbackDate",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "drivingRecords",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "driversLicense",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "licenceType",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "canCompleteMoves",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "isReadyToday",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "disqualificationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlySchedulingStatus",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyInviteeUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallStartTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallEndTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallTimezone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "bookingCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyRescheduled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCanceled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCancellationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "funnelStage",
+            "value": "=variables.applicantRecord.funnelStage"
+          },
+          {
+            "field": "applicationReceivedAt",
+            "value": "=variables.applicantRecord.applicationReceivedAt"
+          },
+          {
+            "field": "preScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "preScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "schedulingLinkSentAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callBookedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "recruiterReviewReadyAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "closedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "hiredAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "rejectionReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "reminderCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callbackAttemptCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastReminderSentAt",
+            "value": "",
+            "skip": true
+          }
+        ],
+        "data": {
+          "applicationThreadId": "=variables.applicantRecord.applicationThreadId",
+          "qualificationStatus": "=variables.applicantRecord.qualificationStatus",
+          "automationStatus": "=variables.applicantRecord.automationStatus",
+          "applicationStatus": "=variables.applicantRecord.applicationStatus",
+          "firstName": "=variables.applicantRecord.firstName",
+          "lastName": "=variables.applicantRecord.lastName",
+          "phone": "=variables.applicantRecord.phone",
+          "email": "=variables.applicantRecord.email",
+          "streetAddress": "=variables.applicantRecord.streetAddress",
+          "city": "=variables.applicantRecord.city",
+          "state": "=variables.applicantRecord.state",
+          "zip": "=variables.applicantRecord.zip",
+          "country": "=variables.applicantRecord.country",
+          "leadSource": "=variables.applicantRecord.leadSource",
+          "applicationSubmittedAt": "=variables.applicantRecord.applicationSubmittedAt",
+          "lastUpdatedAt": "=variables.applicantRecord.lastUpdatedAt",
+          "candidateAge": "=variables.applicantRecord.candidateAge",
+          "drivingYears": "=variables.applicantRecord.drivingYears",
+          "candidateSmoke": "=variables.applicantRecord.candidateSmoke",
+          "english": "=variables.applicantRecord.english",
+          "workAuth": "=variables.applicantRecord.workAuth",
+          "smartPhone": "=variables.applicantRecord.smartPhone",
+          "background": "=variables.applicantRecord.background",
+          "commentsOrQuestions": "=variables.applicantRecord.commentsOrQuestions",
+          "funnelStage": "=variables.applicantRecord.funnelStage",
+          "applicationReceivedAt": "=variables.applicantRecord.applicationReceivedAt"
+        }
+      }
+    },
+    {
+      "nodeId": "node-qualify-new",
+      "name": "Run Qualification Logic",
+      "type": "CODE",
+      "executionIndex": 1,
+      "parentId": "node-create-record",
+      "config": {
+        "outputVariable": "qualResult",
+        "code": "const ext = variables.agentResponse?.extractedData || {};\nconst mustBeYes = ['candidateAge','drivingYears','english','workAuth','smartPhone'];\nconst failedFields = mustBeYes.filter(f => ext[f] !== 'Yes');\nif (ext.candidateSmoke === 'Yes') failedFields.push('candidateSmoke');\nconst passed = failedFields.length === 0;\nconst reasonMap = {\n  candidateAge: 'Does not meet minimum age requirement',\n  drivingYears: 'Does not meet minimum driving experience requirement',\n  english: 'Does not meet English fluency requirement',\n  workAuth: 'Does not have work authorization',\n  smartPhone: 'Does not have a smartphone',\n  candidateSmoke: 'Tobacco use disqualifies candidate'\n};\nconst rejectionReason = failedFields.map(f => reasonMap[f] || f).join('; ');\nreturn { passed, rejectionReason: passed ? '' : rejectionReason };"
+      }
+    },
+    {
+      "nodeId": "node-condition-email-found",
+      "name": "Found",
+      "type": "CONDITION",
+      "executionIndex": 2,
+      "parentId": "node-1782147771806",
+      "config": {
+        "expression": "$count(variables.emailSearchResult.records) > 0"
+      }
+    },
+    {
+      "nodeId": "node-resolve-record-email",
+      "name": "Resolve Existing Record (email found)",
+      "type": "TRANSFORM",
+      "executionIndex": 1,
+      "parentId": "node-condition-email-found",
+      "config": {
+        "template": "{\r\n  \"exists\": true,\r\n  \"existingKey\": variables.emailSearchResult.records[0].key,\r\n  \"recordKey\": variables.agentResponse.extractedData.email\r\n}",
+        "outputVariable": "resolvedRecordEmail"
+      }
+    },
+    {
+      "nodeId": "node-prepare-record-email",
+      "name": "Prepare Applicant Record (email found)",
+      "type": "TRANSFORM",
+      "executionIndex": 3,
+      "parentId": "node-resolve-record-email",
+      "config": {
+        "template": "{\r\n  \"applicationThreadId\": variables.agentResponse.extractedData.applicationThreadId,\r\n  \"firstName\": variables.agentResponse.extractedData.firstName,\r\n  \"lastName\": variables.agentResponse.extractedData.lastName,\r\n  \"phone\": variables.agentResponse.extractedData.phone,\r\n  \"email\": variables.agentResponse.extractedData.email,\r\n  \"streetAddress\": variables.agentResponse.extractedData.streetAddress,\r\n  \"city\": variables.agentResponse.extractedData.city,\r\n  \"state\": variables.agentResponse.extractedData.state,\r\n  \"zip\": variables.agentResponse.extractedData.zip,\r\n  \"country\": variables.agentResponse.extractedData.country,\r\n  \"leadSource\": variables.agentResponse.extractedData.leadSource,\r\n  \"applicationSubmittedAt\": variables.agentResponse.extractedData.applicationSubmittedAt,\r\n  \"candidateAge\": variables.agentResponse.extractedData.candidateAge,\r\n  \"drivingYears\": variables.agentResponse.extractedData.drivingYears,\r\n  \"candidateSmoke\": variables.agentResponse.extractedData.candidateSmoke,\r\n  \"english\": variables.agentResponse.extractedData.english,\r\n  \"workAuth\": variables.agentResponse.extractedData.workAuth,\r\n  \"smartPhone\": variables.agentResponse.extractedData.smartPhone,\r\n  \"background\": variables.agentResponse.extractedData.background,\r\n  \"commentsOrQuestions\": variables.agentResponse.extractedData.commentsOrQuestions,\r\n  \"applicationReceivedAt\": $now(),\r\n  \"lastUpdatedAt\": $now(),\r\n  \"funnelStage\": \"application_received\",\r\n  \"applicationStatus\": \"new\",\r\n  \"automationStatus\": \"application_received\",\r\n  \"qualificationStatus\": \"\"\r\n}",
+        "outputVariable": "applicantRecord"
+      }
+    },
+    {
+      "nodeId": "node-update-record",
+      "name": "Update Data Store Record",
+      "type": "DATA_STORE_UPDATE",
+      "executionIndex": 3,
+      "parentId": "node-prepare-record-email",
+      "config": {
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "key": "=variables.agentResponse.extractedData.email",
+        "merge": true,
+        "outputVariable": "savedRecord",
+        "expressionMode": "jsonata",
+        "fieldMappings": [
+          {
+            "field": "applicationThreadId",
+            "value": "=variables.applicantRecord.applicationThreadId"
+          },
+          {
+            "field": "qualificationStatus",
+            "value": "=variables.applicantRecord.qualificationStatus"
+          },
+          {
+            "field": "automationStatus",
+            "value": "=variables.applicantRecord.automationStatus"
+          },
+          {
+            "field": "applicationStatus",
+            "value": "=variables.applicantRecord.applicationStatus"
+          },
+          {
+            "field": "firstName",
+            "value": "=variables.applicantRecord.firstName"
+          },
+          {
+            "field": "lastName",
+            "value": "=variables.applicantRecord.lastName"
+          },
+          {
+            "field": "phone",
+            "value": "=variables.applicantRecord.phone"
+          },
+          {
+            "field": "email",
+            "value": "=variables.applicantRecord.email"
+          },
+          {
+            "field": "streetAddress",
+            "value": "=variables.applicantRecord.streetAddress"
+          },
+          {
+            "field": "city",
+            "value": "=variables.applicantRecord.city"
+          },
+          {
+            "field": "state",
+            "value": "=variables.applicantRecord.state"
+          },
+          {
+            "field": "zip",
+            "value": "=variables.applicantRecord.zip"
+          },
+          {
+            "field": "country",
+            "value": "=variables.applicantRecord.country"
+          },
+          {
+            "field": "leadSource",
+            "value": "=variables.applicantRecord.leadSource"
+          },
+          {
+            "field": "applicationSubmittedAt",
+            "value": "=variables.applicantRecord.applicationSubmittedAt"
+          },
+          {
+            "field": "lastUpdatedAt",
+            "value": "=variables.applicantRecord.lastUpdatedAt"
+          },
+          {
+            "field": "candidateAge",
+            "value": "=variables.applicantRecord.candidateAge"
+          },
+          {
+            "field": "drivingYears",
+            "value": "=variables.applicantRecord.drivingYears"
+          },
+          {
+            "field": "candidateSmoke",
+            "value": "=variables.applicantRecord.candidateSmoke"
+          },
+          {
+            "field": "english",
+            "value": "=variables.applicantRecord.english"
+          },
+          {
+            "field": "workAuth",
+            "value": "=variables.applicantRecord.workAuth"
+          },
+          {
+            "field": "smartPhone",
+            "value": "=variables.applicantRecord.smartPhone"
+          },
+          {
+            "field": "background",
+            "value": "=variables.applicantRecord.background"
+          },
+          {
+            "field": "commentsOrQuestions",
+            "value": "=variables.applicantRecord.commentsOrQuestions"
+          },
+          {
+            "field": "schedulingLink",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callbackDate",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "drivingRecords",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "driversLicense",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "licenceType",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "canCompleteMoves",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "isReadyToday",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "disqualificationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlySchedulingStatus",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyInviteeUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallStartTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallEndTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallTimezone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "bookingCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyRescheduled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCanceled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCancellationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "funnelStage",
+            "value": "variables.applicantRecord.funnelStage",
+            "skip": true
+          },
+          {
+            "field": "applicationReceivedAt",
+            "value": "variables.applicantRecord.applicationReceivedAt",
+            "skip": true
+          },
+          {
+            "field": "preScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "preScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "schedulingLinkSentAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callBookedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "recruiterReviewReadyAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "closedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "hiredAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "rejectionReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "reminderCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callbackAttemptCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastReminderSentAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceCallSummary",
+            "value": "",
+            "skip": true
+          }
+        ],
+        "data": {
+          "applicationThreadId": "=variables.applicantRecord.applicationThreadId",
+          "qualificationStatus": "=variables.applicantRecord.qualificationStatus",
+          "automationStatus": "=variables.applicantRecord.automationStatus",
+          "applicationStatus": "=variables.applicantRecord.applicationStatus",
+          "firstName": "=variables.applicantRecord.firstName",
+          "lastName": "=variables.applicantRecord.lastName",
+          "phone": "=variables.applicantRecord.phone",
+          "email": "=variables.applicantRecord.email",
+          "streetAddress": "=variables.applicantRecord.streetAddress",
+          "city": "=variables.applicantRecord.city",
+          "state": "=variables.applicantRecord.state",
+          "zip": "=variables.applicantRecord.zip",
+          "country": "=variables.applicantRecord.country",
+          "leadSource": "=variables.applicantRecord.leadSource",
+          "applicationSubmittedAt": "=variables.applicantRecord.applicationSubmittedAt",
+          "lastUpdatedAt": "=variables.applicantRecord.lastUpdatedAt",
+          "candidateAge": "=variables.applicantRecord.candidateAge",
+          "drivingYears": "=variables.applicantRecord.drivingYears",
+          "candidateSmoke": "=variables.applicantRecord.candidateSmoke",
+          "english": "=variables.applicantRecord.english",
+          "workAuth": "=variables.applicantRecord.workAuth",
+          "smartPhone": "=variables.applicantRecord.smartPhone",
+          "background": "=variables.applicantRecord.background",
+          "commentsOrQuestions": "=variables.applicantRecord.commentsOrQuestions"
+        }
+      }
+    },
+    {
+      "nodeId": "node-qualify-existing",
+      "name": "Run Qualification Logic",
+      "type": "CODE",
+      "executionIndex": 3,
+      "parentId": "node-update-record",
+      "config": {
+        "outputVariable": "qualResult",
+        "code": "const ext = variables.agentResponse?.extractedData || {};\nconst mustBeYes = ['candidateAge','drivingYears','english','workAuth','smartPhone'];\nconst failedFields = mustBeYes.filter(f => ext[f] !== 'Yes');\nif (ext.candidateSmoke === 'Yes') failedFields.push('candidateSmoke');\nconst passed = failedFields.length === 0;\nconst reasonMap = {\n  candidateAge: 'Does not meet minimum age requirement',\n  drivingYears: 'Does not meet minimum driving experience requirement',\n  english: 'Does not meet English fluency requirement',\n  workAuth: 'Does not have work authorization',\n  smartPhone: 'Does not have a smartphone',\n  candidateSmoke: 'Tobacco use disqualifies candidate'\n};\nconst rejectionReason = failedFields.map(f => reasonMap[f] || f).join('; ');\nreturn { passed, rejectionReason: passed ? '' : rejectionReason };"
+      }
+    },
+    {
+      "nodeId": "node-1782147821848",
+      "name": "Qualification Decision",
+      "type": "BRANCH",
+      "executionIndex": 1,
+      "parentId": "node-qualify-existing",
+      "config": {
+        "branches": [
+          "node-1782147864813",
+          "node-1782147896179"
+        ],
+        "outputs": [
+          {
+            "id": "output-1",
+            "label": "Branch 1"
+          },
+          {
+            "id": "output-2",
+            "label": "Branch 2"
+          }
+        ],
+        "executionMode": "parallel"
+      }
+    },
+    {
+      "nodeId": "node-1782147864813",
+      "name": "Passed",
+      "type": "CONDITION",
+      "executionIndex": 1,
+      "parentId": "node-1782147821848",
+      "config": {
+        "expression": "variables.qualResult.passed = true"
+      }
+    },
+    {
+      "nodeId": "node-1782147896179",
+      "name": "Failed",
+      "type": "CONDITION",
+      "executionIndex": 2,
+      "parentId": "node-1782147821848",
+      "config": {
+        "expression": "variables.qualResult.passed = false"
+      }
+    },
+    {
+      "nodeId": "node-pass-update-existing",
+      "name": "Update Record - Pre-Screen Passed",
+      "type": "DATA_STORE_UPDATE",
+      "executionIndex": 2,
+      "parentId": "node-1782147864813",
+      "config": {
+        "conditionResult": true,
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "key": "=variables.agentResponse.extractedData.email",
+        "merge": true,
+        "outputVariable": "passUpdateExisting",
+        "expressionMode": "jsonata",
+        "fieldMappings": [
+          {
+            "field": "applicationThreadId",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "qualificationStatus",
+            "value": "passed_pre_screen"
+          },
+          {
+            "field": "automationStatus",
+            "value": "application_received",
+            "skip": false
+          },
+          {
+            "field": "applicationStatus",
+            "value": "awaiting_candidate_booking"
+          },
+          {
+            "field": "firstName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "phone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "email",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "streetAddress",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "city",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "state",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "zip",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "country",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "leadSource",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "applicationSubmittedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastUpdatedAt",
+            "value": "=$now()"
+          },
+          {
+            "field": "candidateAge",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "drivingYears",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "candidateSmoke",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "english",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "workAuth",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "smartPhone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "background",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "commentsOrQuestions",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "schedulingLink",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callbackDate",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "drivingRecords",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "driversLicense",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "licenceType",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "canCompleteMoves",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "isReadyToday",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "disqualificationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlySchedulingStatus",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyInviteeUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallStartTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallEndTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallTimezone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "bookingCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyRescheduled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCanceled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCancellationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "funnelStage",
+            "value": "pre_screen_passed"
+          },
+          {
+            "field": "applicationReceivedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "preScreenPassedAt",
+            "value": "=$now()"
+          },
+          {
+            "field": "preScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "schedulingLinkSentAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callBookedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "recruiterReviewReadyAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "closedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "hiredAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "rejectionReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "reminderCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callbackAttemptCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastReminderSentAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceCallSummary",
+            "value": "",
+            "skip": true
+          }
+        ],
+        "data": {
+          "qualificationStatus": "passed_pre_screen",
+          "automationStatus": "application_received",
+          "applicationStatus": "awaiting_candidate_booking",
+          "lastUpdatedAt": "=$now()",
+          "funnelStage": "pre_screen_passed",
+          "preScreenPassedAt": "=$now()"
+        }
+      }
+    },
+    {
+      "nodeId": "node-calendly-existing",
+      "name": "Generate Calendly Scheduling Link",
+      "type": "API",
+      "executionIndex": 2,
+      "parentId": "node-pass-update-existing",
+      "config": {
+        "nodeDefName": "calendly-create-scheduling-link",
+        "outputVariable": "calendlyResult",
+        "inputs": {
+          "apiToken": "[REDACTED]",
+          "max_event_count": "1",
+          "owner": "$lookup($vars, 'CALENDLY_EVENT_TYPE_URI')",
+          "owner_type": "\"EventType\""
+        },
+        "method": "POST",
+        "url": "https://api.calendly.com/scheduling_links",
+        "body": {
+          "max_event_count": 1,
+          "owner": "https://api.calendly.com/event_types/fba9a91a-3e7a-48e0-955c-48812054b111",
+          "owner_type": "EventType"
+        },
+        "headers": {
+          "Authorization": "Bearer {{CALENDLY_API_TOKEN}}",
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "nodeId": "node-schedule-email-existing",
+      "name": "Send Scheduling Email to Candidate",
+      "type": "MICROSOFT_SEND",
+      "executionIndex": 2,
+      "parentId": "node-calendly-existing",
+      "config": {
+        "credentialId": "6a0f4cd9e8c4522c7685d616",
+        "to": "{{variables.agentResponse.extractedData.email}}",
+        "subject": "Phone Screening Invitation – Driver Position",
+        "bodyType": "html",
+        "body": "<div style=\"font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #000; line-height: 1.5; max-width: 700px;\"><p>Hi {{variables.agentResponse.extractedData.firstName}},</p><p>I hope this message finds you well.</p><p>I'm Riley, an automated talent agent at PARS and I have received notice of your interest in becoming a driver and would like to schedule a brief phone screening with you.</p><p>Please choose a convenient date and time for your screening call by clicking this link: <a href=\"{{variables.calendlyResult.resource.booking_url}}\" style=\"color: #0056b3;\">Schedule Your Screening Call</a>. I look forward to speaking with you.</p><br><p style=\"margin-bottom: 0;\"><strong>Riley</strong></p><p style=\"margin-top: 0;\"><em>Talent Agent</em></p><p style=\"margin-bottom: 0;\"><strong>PARS Inc.</strong></p><p style=\"margin: 0;\">7001 Heritage Village Plaza</p><p style=\"margin: 0;\">Suite 280</p><p style=\"margin: 0;\">Gainesville, VA 20155</p><p style=\"margin: 0;\">Toll Free: 800-728-2211</p><p style=\"margin: 0;\">Email: <a href=\"mailto:recruitment@parsinc.com\" style=\"color: #0056b3;\">recruitment@parsinc.com</a></p><p style=\"margin: 0;\"><a href=\"https://www.parsinc.com\" style=\"color: #000;\">www.parsinc.com</a></p></div>",
+        "cc": "recruitment@parsinc.com, tammy.do@parsinc.com, lee.velasco@parsinc.com, navnik.shivadas@parsinc.com"
+      }
+    },
+    {
+      "nodeId": "node-schedule-sent-existing",
+      "name": "Update Record - Scheduling Email Sent",
+      "type": "DATA_STORE_UPDATE",
+      "executionIndex": 2,
+      "parentId": "node-schedule-email-existing",
+      "config": {
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "key": "=variables.agentResponse.extractedData.email",
+        "merge": true,
+        "outputVariable": "scheduleSentExisting",
+        "expressionMode": "jsonata",
+        "fieldMappings": [
+          {
+            "field": "applicationThreadId",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "qualificationStatus",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "automationStatus",
+            "value": "scheduling_email_sent"
+          },
+          {
+            "field": "applicationStatus",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "firstName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "phone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "email",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "streetAddress",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "city",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "state",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "zip",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "country",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "leadSource",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "applicationSubmittedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastUpdatedAt",
+            "value": "=$now()"
+          },
+          {
+            "field": "candidateAge",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "drivingYears",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "candidateSmoke",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "english",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "workAuth",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "smartPhone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "background",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "commentsOrQuestions",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "schedulingLink",
+            "value": "=variables.calendlyResult.resource.booking_url",
+            "skip": false
+          },
+          {
+            "field": "callbackDate",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "drivingRecords",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "driversLicense",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "licenceType",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "canCompleteMoves",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "isReadyToday",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "disqualificationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlySchedulingStatus",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyInviteeUri",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyEventName",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallStartTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallEndTime",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "scheduledCallTimezone",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "bookingCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyRescheduled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCanceled",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "calendlyCancellationReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "funnelStage",
+            "value": "scheduling_link_sent"
+          },
+          {
+            "field": "applicationReceivedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "preScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "preScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "schedulingLinkSentAt",
+            "value": "=$now()"
+          },
+          {
+            "field": "callBookedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callCompletedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenPassedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceScreenFailedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "recruiterReviewReadyAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "closedAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "hiredAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "rejectionReason",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "reminderCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "callbackAttemptCount",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "lastReminderSentAt",
+            "value": "",
+            "skip": true
+          },
+          {
+            "field": "voiceCallSummary",
+            "value": "",
+            "skip": true
+          }
+        ],
+        "data": {
+          "automationStatus": "scheduling_email_sent",
+          "lastUpdatedAt": "=$now()",
+          "schedulingLink": "=variables.calendlyResult.resource.booking_url",
+          "funnelStage": "scheduling_link_sent",
+          "schedulingLinkSentAt": "=$now()"
+        }
+      }
+    },
+    {
+      "nodeId": "node-fail-update-existing",
+      "name": "Update Record - Pre-Screen Failed",
+      "type": "DATA_STORE_UPDATE",
+      "executionIndex": 2,
+      "parentId": "node-1782147896179",
+      "config": {
+        "conditionResult": false,
+        "dataStoreId": "6a2873ae79a7e88a96365765",
+        "key": "=variables.agentResponse.extractedData.email",
+        "merge": true,
+        "outputVariable": "failUpdateExisting",
+        "expressionMode": "jsonata",
+        "fieldMappings": [
+          {
+            "field": "qualificationStatus",
+            "value": "failed_pre_screen"
+          },
+          {
+            "field": "automationStatus",
+            "value": "closed"
+          },
+          {
+            "field": "applicationStatus",
+            "value": "disqualified"
+          },
+          {
+            "field": "lastUpdatedAt",
+            "value": "=$now()"
+          },
+          {
+            "field": "funnelStage",
+            "value": "pre_screen_failed"
+          },
+          {
+            "field": "preScreenFailedAt",
+            "value": "=$now()"
+          },
+          {
+            "field": "rejectionReason",
+            "value": "=variables.qualResult.rejectionReason"
+          }
+        ],
+        "data": {
+          "qualificationStatus": "failed_pre_screen",
+          "automationStatus": "closed",
+          "applicationStatus": "disqualified",
+          "lastUpdatedAt": "=$now()",
+          "funnelStage": "pre_screen_failed",
+          "preScreenFailedAt": "=$now()",
+          "rejectionReason": "=variables.qualResult.rejectionReason"
+        }
+      }
+    }
+  ],
+  "isActive": false,
+  "activatedAt": "2026-06-25T19:26:45.224Z",
+  "activatedBy": "auth0|6a0b38e7ad2af99f85b1b92d",
+  "activatedByName": "Navnik Shivadas",
+  "deactivatedAt": "2026-08-12T17:31:18.955Z",
+  "deactivatedBy": "auth0|6a0b38e7ad2af99f85b1b92d",
+  "deactivatedByName": "Navnik Shivadas",
+  "version": 131,
+  "publishedVersion": 131,
+  "updatedBy": "auth0|6a0b38e7ad2af99f85b1b92d",
+  "updatedByName": "Navnik Shivadas",
+  "createdAt": "2026-06-19T17:41:05.973Z",
+  "updatedAt": "2026-08-12T17:37:15.644Z",
+  "variables": []
+}
